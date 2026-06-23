@@ -1,0 +1,346 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Block Drop</title>
+<style>
+body{
+    background:#222;
+    color:white;
+    text-align:center;
+    font-family:sans-serif;
+}
+
+canvas{
+    border:2px solid white;
+    background:black;
+}
+
+#score{
+    margin:10px;
+    font-size:24px;
+}
+</style>
+</head>
+<body>
+
+<h1>Block Drop</h1>
+<div id="score">Score: 0</div>
+<canvas id="game" width="300" height="600"></canvas>
+
+<div id="controls">
+  <button id="leftBtn">◀</button>
+  <button id="rotateBtn">⟳</button>
+  <button id="rightBtn">▶</button>
+  <button id="downBtn">▼</button>
+</div>
+
+<style>
+#controls{
+  margin:15px auto;
+  display:flex;
+  justify-content:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+#controls button{
+  font-size:28px;
+  padding:12px 18px;
+  min-width:70px;
+  touch-action:manipulation;
+}
+canvas{
+  max-width:95vw;
+  height:auto;
+}
+</style>
+
+
+<p>
+← → : 移動<br>
+↑ : 回転<br>
+↓ : 高速落下
+</p>
+
+<script>
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const COLS = 10;
+const ROWS = 20;
+const SIZE = 30;
+
+let score = 0;
+
+const board =
+Array.from({length:ROWS},
+()=>Array(COLS).fill(0));
+
+const shapes = [
+[[1,1,1,1]],
+[[1,1],[1,1]],
+[[0,1,0],[1,1,1]],
+[[1,1,0],[0,1,1]],
+[[0,1,1],[1,1,0]]
+];
+
+function randomPiece(){
+    return {
+        shape:
+        JSON.parse(
+            JSON.stringify(
+                shapes[Math.floor(
+                    Math.random()*shapes.length
+                )]
+            )
+        ),
+        x:3,
+        y:0
+    };
+}
+
+let piece = randomPiece();
+
+function drawCell(x,y,color){
+    ctx.fillStyle=color;
+    ctx.fillRect(
+        x*SIZE,
+        y*SIZE,
+        SIZE-1,
+        SIZE-1
+    );
+}
+
+function draw(){
+
+    ctx.clearRect(
+        0,0,
+        canvas.width,
+        canvas.height
+    );
+
+    for(let y=0;y<ROWS;y++){
+        for(let x=0;x<COLS;x++){
+            if(board[y][x]){
+                drawCell(x,y,"cyan");
+            }
+        }
+    }
+
+    piece.shape.forEach((row,dy)=>{
+        row.forEach((value,dx)=>{
+            if(value){
+                drawCell(
+                    piece.x+dx,
+                    piece.y+dy,
+                    "orange"
+                );
+            }
+        });
+    });
+}
+
+function collision(px,py,shape){
+
+    for(let y=0;y<shape.length;y++){
+        for(let x=0;x<shape[y].length;x++){
+
+            if(!shape[y][x]) continue;
+
+            let nx = px+x;
+            let ny = py+y;
+
+            if(
+                nx<0 ||
+                nx>=COLS ||
+                ny>=ROWS
+            ) return true;
+
+            if(
+                ny>=0 &&
+                board[ny][nx]
+            ) return true;
+        }
+    }
+
+    return false;
+}
+
+function merge(){
+
+    piece.shape.forEach((row,y)=>{
+        row.forEach((value,x)=>{
+            if(value){
+                board[piece.y+y][piece.x+x]=1;
+            }
+        });
+    });
+}
+
+function clearLines(){
+
+    let lines=0;
+
+    for(let y=ROWS-1;y>=0;y--){
+
+        if(board[y].every(v=>v)){
+
+            board.splice(y,1);
+
+            board.unshift(
+                Array(COLS).fill(0)
+            );
+
+            lines++;
+            y++;
+        }
+    }
+
+    if(lines){
+        score += lines*100;
+
+        document.getElementById(
+            "score"
+        ).textContent =
+        "Score: "+score;
+    }
+}
+
+function rotate(shape){
+
+    return shape[0].map(
+        (_,i)=>
+        shape.map(
+            row=>row[i]
+        ).reverse()
+    );
+}
+
+function update(){
+
+    if(
+        !collision(
+            piece.x,
+            piece.y+1,
+            piece.shape
+        )
+    ){
+        piece.y++;
+    }
+    else{
+
+        merge();
+        clearLines();
+
+        piece = randomPiece();
+
+        if(
+            collision(
+                piece.x,
+                piece.y,
+                piece.shape
+            )
+        ){
+
+            alert(
+                "Game Over! Score: "
+                + score
+            );
+
+            location.reload();
+        }
+    }
+
+    draw();
+}
+
+document.addEventListener(
+"keydown",
+e=>{
+
+    if(
+        e.key==="ArrowLeft" &&
+        !collision(
+            piece.x-1,
+            piece.y,
+            piece.shape
+        )
+    ){
+        piece.x--;
+    }
+
+    if(
+        e.key==="ArrowRight" &&
+        !collision(
+            piece.x+1,
+            piece.y,
+            piece.shape
+        )
+    ){
+        piece.x++;
+    }
+
+    if(
+        e.key==="ArrowDown" &&
+        !collision(
+            piece.x,
+            piece.y+1,
+            piece.shape
+        )
+    ){
+        piece.y++;
+    }
+
+    if(e.key==="ArrowUp"){
+
+        const rotated =
+        rotate(piece.shape);
+
+        if(
+            !collision(
+                piece.x,
+                piece.y,
+                rotated
+            )
+        ){
+            piece.shape =
+            rotated;
+        }
+    }
+
+    draw();
+});
+
+draw();
+
+
+function handleMove(action){
+    if(action==="left" && !collision(piece.x-1,piece.y,piece.shape)) piece.x--;
+    if(action==="right" && !collision(piece.x+1,piece.y,piece.shape)) piece.x++;
+    if(action==="down" && !collision(piece.x,piece.y+1,piece.shape)) piece.y++;
+    if(action==="rotate"){
+        const rotated = rotate(piece.shape);
+        if(!collision(piece.x,piece.y,rotated)) piece.shape = rotated;
+    }
+    draw();
+}
+
+document.getElementById("leftBtn").addEventListener("touchstart",e=>{e.preventDefault();handleMove("left");});
+document.getElementById("rightBtn").addEventListener("touchstart",e=>{e.preventDefault();handleMove("right");});
+document.getElementById("downBtn").addEventListener("touchstart",e=>{e.preventDefault();handleMove("down");});
+document.getElementById("rotateBtn").addEventListener("touchstart",e=>{e.preventDefault();handleMove("rotate");});
+
+document.getElementById("leftBtn").addEventListener("click",()=>handleMove("left"));
+document.getElementById("rightBtn").addEventListener("click",()=>handleMove("right"));
+document.getElementById("downBtn").addEventListener("click",()=>handleMove("down"));
+document.getElementById("rotateBtn").addEventListener("click",()=>handleMove("rotate"));
+
+
+setInterval(update,500);
+
+</script>
+
+</body>
+</html>
